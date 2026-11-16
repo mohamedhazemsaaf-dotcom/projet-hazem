@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GEOSIM 3D — Banc d'Essai Mécanique & Géométrique</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <!-- Calque des Étiquettes Flottantes sur les Vecteurs 3D -->
+  <div id="vector-labels-layer"></div>
+
+  <!-- Barre Scientifique Supérieure -->
+  <div class="top-mini-hud">
+    <span>$t$ : <strong id="hud-time">0.00 s</strong></span>
+    <span class="sep">|</span>
+    <span>$y_{\text{alt}}$ : <strong id="hud-alt">0.00 m</strong></span>
+    <span class="sep">|</span>
+    <span>$\|\vec{v}\|$ : <strong id="hud-vel">0.00 m/s</strong></span>
+    <span class="sep">|</span>
+    <span>$\vec{\theta}$ : <strong id="hud-theta">(0°, 0°, 0°)</strong></span>
+    <span class="sep">|</span>
+    <div class="time-controls">
+      <button id="btn-pause" class="hud-btn" title="Pause / Reprendre (Touche P)">⏸ Pause</button>
+      <button id="btn-step" class="hud-btn" title="Avancer d'un pas Δt = 0.016s" disabled>⏭ +Δt</button>
+    </div>
+  </div>
+
+  <!-- SLIDE-BAR 1 (GAUCHE) : Paramètres & Navigation -->
+  <aside class="slide-drawer slide-left" id="drawer-left">
+    <div class="drawer-tab tab-left">
+      <span>⚙</span>
+      <span class="tab-vertical">LABO</span>
+    </div>
+
+    <div class="drawer-content">
+      <div class="drawer-header">
+        <div>
+          <h1>GEOSIM <span class="badge">LABO 3D</span></h1>
+          <p>Banc d'Essai Mécanique</p>
+        </div>
+        <label class="pin-label" title="Épingler ce panneau">
+          <input type="checkbox" id="pin-left" /> 📌
+        </label>
+      </div>
+
+      <!-- Bouton vers la Page des Expériences Réelles -->
+      <a href="experiments.html" class="exp-link-btn">
+        🔬 Expériences Réelles (Newton's Balls...) →
+      </a>
+
+      <div class="control-group">
+        <label>1. Référentiel Caméra</label>
+        <button id="toggle-lock-btn" class="full-btn">🔒 Caméra Suiveuse (3ème Pers.)</button>
+      </div>
+
+      <div class="control-group">
+        <label for="shape-select">2. Solide Géométrique Étudié</label>
+        <select id="shape-select">
+          <option value="cube" selected>Cube (Hexaèdre régulier)</option>
+          <option value="octahedron">Octaèdre régulier (8 faces)</option>
+          <option value="icosahedron">Icosaèdre régulier (20 faces)</option>
+          <option value="pyramid">Pyramide à base carrée</option>
+          <option value="torus">Tore (Anneau 3D)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>3. Grandeurs Physiques</label>
+        <div class="range-header">
+          <span>Masse du solide ($m$)</span>
+          <span class="val-highlight"><span id="mass-val">2.0</span> kg</span>
+        </div>
+        <input type="range" id="mass-slider" min="0.5" max="30" step="0.5" value="2.0" />
+
+        <div class="range-header">
+          <span>Force de propulsion ($F_p$)</span>
+          <span class="val-highlight"><span id="thrust-val">35</span> N</span>
+        </div>
+        <input type="range" id="thrust-slider" min="5" max="150" step="5" value="35" />
+
+        <div class="range-header">
+          <span>Vitesse Saut ($v_{y0}$)</span>
+          <span class="val-highlight"><span id="jump-val">8.0</span> m/s</span>
+        </div>
+        <input type="range" id="jump-slider" min="3" max="18" step="0.5" value="8.0" />
+      </div>
+
+      <div class="control-group">
+        <label>4. Outils Visuels d'Analyse</label>
+        <div class="toggle-row">
+          <span>Repère local (<span class="ax-x">X</span>, <span class="ax-y">Y</span>, <span class="ax-z">Z</span>)</span>
+          <input type="checkbox" id="axes-toggle" checked />
+        </div>
+        <div class="toggle-row">
+          <span>Tracer la trajectoire $\vec{r}(t)$</span>
+          <input type="checkbox" id="trail-toggle" checked />
+        </div>
+        <div class="toggle-row">
+          <span>Maillage (Wireframe)</span>
+          <input type="checkbox" id="wireframe-toggle" />
+        </div>
+        <div class="btn-grid-2">
+          <button id="clear-trail-btn">🧹 Effacer Trace</button>
+          <button id="reset-pos-btn">↺ Origine (0,0,0)</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <button id="open-math-btn" class="math-btn">📐 Cours Complet, Formules & Matrices</button>
+      </div>
+
+      <div class="info-box">
+        <strong>Protocole Clavier (AZERTY) :</strong>
+        <ul>
+          <li><span class="kbd">Espace</span> : Impulsion verticale (Saut)</li>
+          <li><span class="kbd">↑</span> / <span class="kbd">↓</span> : Translation AV/AR (varie $\theta_x$)</li>
+          <li><span class="kbd">←</span> / <span class="kbd">→</span> : Rotation Lacet ($\theta_y$) & Roulis ($\theta_z$)</li>
+          <li><span class="kbd">R</span> / <span class="kbd">F</span> : Poussée verticale ($+Y / -Y$)</li>
+          <li><span class="kbd">Z</span> / <span class="kbd">S</span> & <span class="kbd">Q</span> / <span class="kbd">D</span> : Inclinaison $\theta_x, \theta_z$</li>
+          <li><span class="kbd">B</span> : Frein doux &nbsp;|&nbsp; <span class="kbd">P</span> : Pause</li>
+        </ul>
+      </div>
+    </div>
+  </aside>
+
+  <!-- SLIDE-BAR 2 (DROITE) : Acquisition des Données & Courbes -->
+  <aside class="slide-drawer slide-right" id="drawer-right">
+    <div class="drawer-tab tab-right">
+      <span>📈</span>
+      <span class="tab-vertical">DONNÉES</span>
+    </div>
+
+    <div class="drawer-content">
+      <div class="drawer-header">
+        <div>
+          <h2>Acquisition Cinématique</h2>
+          <p>Vecteurs & courbes en temps réel</p>
+        </div>
+        <label class="pin-label" title="Épingler ce panneau">
+          <input type="checkbox" id="pin-right" /> 📌
+        </label>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-legend">
+          <span class="leg-y">● Altitude $y(t)$ [m]</span>
+          <span class="leg-v">● Vitesse $\|\vec{v}\|(t)$ [m/s]</span>
+        </div>
+        <canvas id="telemetry-chart" width="295" height="105"></canvas>
+      </div>
+
+      <div class="formula-row">
+        <div class="f-eq">$\sum \vec{F} = m\vec{a}$ (Résultante des forces)</div>
+        <div class="f-val">
+          F = (<span class="ax-x" id="live-fx">0.0</span>, <span class="ax-y" id="live-fy">0.0</span>, <span class="ax-z" id="live-fz">0.0</span>) N
+        </div>
+      </div>
+
+      <div class="formula-row">
+        <div class="f-eq">$\vec{a}(t) = \frac{\sum \vec{F}}{m}$ (Accélération)</div>
+        <div class="f-val">
+          a = (<span class="ax-x" id="live-ax">0.0</span>, <span class="ax-y" id="live-ay">0.0</span>, <span class="ax-z" id="live-az">0.0</span>) m/s²
+        </div>
+      </div>
+
+      <div class="formula-row">
+        <div class="f-eq">$\vec{v}(t) = \vec{v}_0 + \int \vec{a}\,dt$ (Vitesse)</div>
+        <div class="f-val">
+          v = (<span class="ax-x" id="live-vx">0.0</span>, <span class="ax-y" id="live-vy">0.0</span>, <span class="ax-z" id="live-vz">0.0</span>) m/s
+        </div>
+      </div>
+
+      <div class="formula-row">
+        <div class="f-eq">$\vec{r}(t) = (x, y_{\text{alt}}, z)$ (Position)</div>
+        <div class="f-val">
+          r = (<span class="ax-x" id="live-rx">0.0</span>, <span class="ax-y" id="live-ry">0.0</span>, <span class="ax-z" id="live-rz">0.0</span>) m
+        </div>
+      </div>
+
+      <div class="formula-row highlight-theta">
+        <div class="f-eq">$\vec{\theta}(t) = (\theta_x, \theta_y, \theta_z)$ (Angles d'Euler)</div>
+        <div class="f-val">
+          θ = (<span class="ax-x" id="live-tx">0°</span>, <span class="ax-y" id="live-ty">0°</span>, <span class="ax-z" id="live-tz">0°</span>)
+        </div>
+      </div>
+
+      <div class="formula-row">
+        <div class="f-eq">Bilan Énergétique ($E_m = E_c + E_p$)</div>
+        <div class="f-val">
+          $E_c$: <span class="val-highlight" id="live-ec">0.0</span> J |
+          $E_p$: <span class="val-highlight" id="live-ep">0.0</span> J |
+          $E_m$: <span class="val-amber" id="live-em">0.0</span> J
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- SLIDE-BAR 3 (BAS) : Sélecteur des Forces avec Code Couleur Exact -->
+  <section class="slide-drawer slide-bottom" id="drawer-bottom">
+    <div class="drawer-tab tab-bottom">
+      <span>🧲 FORCES EXTÉRIEURES APPLIQUÉES</span>
+    </div>
+
+    <div class="bottom-drawer-content">
+      <div class="bottom-bar-header">
+        <div class="bottom-title">
+          <strong>Configuration des Forces (Code Couleur = Flèches 3D)</strong>
+          <label class="inline-toggle">
+            <input type="checkbox" id="show-force-vectors" checked /> Afficher Vecteurs & Noms sur le Dessin
+          </label>
+        </div>
+        <label class="pin-label" title="Épingler ce panneau">
+          <input type="checkbox" id="pin-bottom" /> 📌 Épingler
+        </label>
+      </div>
+
+      <div class="forces-grid-horizontal">
+        <div class="force-item" style="border-left: 4px solid #ff4d4d;">
+          <label><input type="checkbox" id="f-gravity" checked /> <span class="c-dot" style="background:#ff4d4d"></span> Poids ($\vec{P} = m\vec{g}$)</label>
+          <select id="gravity-planet" class="mini-select">
+            <option value="9.81" selected>Terre (9.81)</option>
+            <option value="1.62">Lune (1.62)</option>
+            <option value="3.72">Mars (3.72)</option>
+            <option value="24.79">Jupiter (24.79)</option>
+          </select>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #2ecc71;">
+          <label><input type="checkbox" id="f-normal" checked /> <span class="c-dot" style="background:#2ecc71"></span> Réaction Sol ($\vec{N}$)</label>
+          <span class="force-tag">Sol y=0</span>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #38bdf8;">
+          <label><input type="checkbox" id="f-thrust" checked /> <span class="c-dot" style="background:#38bdf8"></span> Poussée ($\vec{F}_p$)</label>
+          <span class="force-tag">Clavier</span>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #fb923c;">
+          <label><input type="checkbox" id="f-friction" checked /> <span class="c-dot" style="background:#fb923c"></span> Frottement ($\vec{f}_c$)</label>
+          <select id="friction-surface" class="mini-select">
+            <option value="0.05">Glace (0.05)</option>
+            <option value="0.35" selected>Béton (0.35)</option>
+            <option value="0.80">Caoutchouc (0.8)</option>
+          </select>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #c084fc;">
+          <label><input type="checkbox" id="f-drag" checked /> <span class="c-dot" style="background:#c084fc"></span> Traînée Air ($\vec{F}_d$)</label>
+          <span class="force-tag">Cd=0.8</span>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #2dd4bf;">
+          <label><input type="checkbox" id="f-archimedes" /> <span class="c-dot" style="background:#2dd4bf"></span> Archimède ($\vec{\Pi}_A$)</label>
+          <select id="fluid-medium" class="mini-select">
+            <option value="1.225">Air</option>
+            <option value="1000" selected>Eau</option>
+            <option value="1260">Glycérine</option>
+          </select>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #f472b6;">
+          <label><input type="checkbox" id="f-viscous" /> <span class="c-dot" style="background:#f472b6"></span> Stokes ($-k_v\vec{v}$)</label>
+          <span class="force-tag">Fluide</span>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #f472b6;">
+          <label><input type="checkbox" id="f-lift" /> <span class="c-dot" style="background:#f472b6"></span> Portance ($\vec{F}_L$)</label>
+          <span class="force-tag">Lift +Y</span>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #f472b6;">
+          <label><input type="checkbox" id="f-spring" /> <span class="c-dot" style="background:#f472b6"></span> Ressort ($-k\Delta\vec{r}$)</label>
+          <span class="force-tag">Hooke</span>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #f472b6;">
+          <label><input type="checkbox" id="f-wind" /> <span class="c-dot" style="background:#f472b6"></span> Vent Latéral</label>
+          <span class="force-tag">+15N X</span>
+        </div>
+
+        <div class="force-item" style="border-left: 4px solid #f472b6;">
+          <label><input type="checkbox" id="f-coriolis" /> <span class="c-dot" style="background:#f472b6"></span> Coriolis</label>
+          <span class="force-tag">Terre</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Page Pédagogique : Encyclopédie des Forces & Matrices -->
+  <section id="math-page" class="math-overlay hidden">
+    <div class="math-container">
+      <div class="math-header">
+        <div>
+          <h2 id="math-shape-title">Cours & Encyclopédie Mécanique — Analyse Matricielle 3D</h2>
+          <p>Formalisme vectoriel, théorèmes énergétiques et matrices de transformation</p>
+        </div>
+        <button id="close-math-btn" class="close-btn">✕ Retour au Banc d'Essai</button>
+      </div>
+
+      <div class="math-grid">
+        <div class="math-card">
+          <h3>1. Géométrie & Moment d'Inertie du Solide</h3>
+          <div id="geo-formulas" class="formula-block"></div>
+        </div>
+
+        <div class="math-card">
+          <h3>2. Lois Fondamentales, Impulsion & Énergie</h3>
+          <div id="backend-laws-container" class="formula-block"></div>
+        </div>
+
+        <div class="math-card full-width">
+          <h3>3. Catalogue Complet des Forces Extérieures</h3>
+          <div id="backend-forces-grid" class="forces-encyclopedia-grid"></div>
+        </div>
+
+        <div class="math-card full-width">
+          <h3>4. Matrices de Rotation 3D ($R_x, R_y, R_z$) évaluées à l'instant $t$</h3>
+          <div class="matrices-row">
+            <div class="matrix-box">
+              <h4>Axe X — Tangage / Roulement ($\theta_x$)</h4>
+              <pre id="mat-rx"></pre>
+            </div>
+            <div class="matrix-box">
+              <h4>Axe Y — Lacet ($\theta_y$)</h4>
+              <pre id="mat-ry"></pre>
+            </div>
+            <div class="matrix-box">
+              <h4>Axe Z — Roulis ($\theta_z$)</h4>
+              <pre id="mat-rz"></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="math-card full-width">
+          <h3>5. Matrice Homogène de Transformation $M \in \mathbb{R}^{4 \times 4}$</h3>
+          <pre id="mat-total" class="live-matrix"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
