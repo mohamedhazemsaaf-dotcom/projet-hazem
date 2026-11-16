@@ -119,7 +119,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       <div id="exp-canvas"></div>
       <div id="exp-labels"></div>
       <nav class="exp-topbar">
-        <a href="index.html" class="back-btn">← Retour Banc 3D</a>
+        <a href="index.HTML" class="back-btn">← Retour Banc 3D</a>
         <button class="tab-btn active" data-exp="cradle">1. Pendule de Newton (Billes)</button>
         <button class="tab-btn" data-exp="incline">2. Plan Incliné</button>
         <button class="tab-btn" data-exp="spring">3. Ressort-Masse</button>
@@ -128,6 +128,36 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     `;
   }
 })();
+
+let mathJaxLoadListenerRegistered = false;
+
+function typesetMath() {
+  const mathJax = window.MathJax;
+  if (mathJax && typeof mathJax.typesetPromise === 'function') {
+    mathJax.typesetPromise().catch((error) => {
+      console.error('MathJax typesetting failed:', error);
+    });
+    return;
+  }
+
+  const mathJaxScript = document.getElementById('MathJax-script');
+  if (!mathJaxScript || mathJaxLoadListenerRegistered) return;
+
+  mathJaxLoadListenerRegistered = true;
+  mathJaxScript.addEventListener('load', () => {
+    const loadedMathJax = window.MathJax;
+    if (loadedMathJax && typeof loadedMathJax.typesetPromise === 'function') {
+      loadedMathJax.typesetPromise().catch((error) => {
+        console.error('MathJax typesetting failed:', error);
+      });
+    } else {
+      console.error('MathJax loaded without typesetPromise');
+    }
+  }, { once: true });
+  mathJaxScript.addEventListener('error', () => {
+    console.error('MathJax failed to load');
+  }, { once: true });
+}
 
 const container = document.getElementById('exp-canvas');
 const labelsLayer = document.getElementById('exp-labels');
@@ -289,7 +319,7 @@ function initNewtonsCradle() {
     <div class="live-readout" id="cradle-stats">Billes actives : 1 / 5</div>
   `;
 
-  if (window.MathJax) MathJax.typesetPromise();
+  typesetMath();
 
   document.getElementById('cradle-count').addEventListener('input', (e) => {
     liftCount = parseInt(e.target.value);
@@ -426,7 +456,7 @@ function initInclinedPlane() {
     <div class="live-readout" id="inc-stats">a = 0.00 m/s²</div>
   `;
 
-  if (window.MathJax) MathJax.typesetPromise();
+  typesetMath();
 
   document.getElementById('inc-ang').addEventListener('input', (e) => {
     angleDeg = parseFloat(e.target.value);
@@ -565,7 +595,7 @@ function initSpringOscillator() {
     <div class="live-readout" id="spr-stats">Période T₀ : 1.78 s</div>
   `;
 
-  if (window.MathJax) MathJax.typesetPromise();
+  typesetMath();
 
   document.getElementById('spr-m').addEventListener('input', (e) => {
     mass = parseFloat(e.target.value);
