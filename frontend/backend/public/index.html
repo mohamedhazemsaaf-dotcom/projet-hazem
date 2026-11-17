@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#87ceeb">
+  <title>GEOSIM 3D/4D — Laboratoire de mécanique</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      startup: { typeset: false }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main id="scene" aria-label="Simulation 3D interactive"></main>
+
+  <header class="status-bar">
+    <a class="brand" href="#" aria-label="GEOSIM accueil"><span class="brand-mark">G</span> GEOSIM <span class="brand-sub">LABO 3D</span></a>
+    <div class="panel-launchers" aria-label="Panneaux latéraux">
+      <button id="toggle-lesson" class="panel-launcher" aria-expanded="false">Analyse</button>
+      <button id="toggle-tools" class="panel-launcher" aria-expanded="false">Formes</button>
+      <button id="toggle-tutorial" class="panel-launcher" aria-expanded="false">Démos</button>
+      <button id="open-learning-hub" class="panel-launcher">Parcours</button>
+    </div>
+    <div class="status-values">
+      <span>Temps de rotation <b id="read-time">0.00 s</b></span>
+      <span>Repère fixe <b id="read-position">(0.00, 0.00, 0.00) m</b></span>
+      <span>Objet <b id="read-shape">Cube · 3D</b></span>
+    </div>
+    <button id="open-course" class="quiet-button">Cours & matrices</button>
+  </header>
+
+  <aside id="lesson-panel" class="lesson-panel" aria-label="Grandeurs physiques en direct" aria-hidden="true" inert>
+    <div class="eyebrow">CINÉMATIQUE DE ROTATION</div>
+    <h1>Orientation du solide</h1>
+    <p class="intro">Le centre reste fixe en O. Seule l’attitude du solide évolue dans le référentiel monde.</p>
+    <div class="equation">
+      <span class="equation-name">Repère spatial invariant</span>
+      <span>$\vec r_O(t) = (0,0,0)$</span>
+      <small>Aucune force ni translation appliquée.</small>
+    </div>
+    <div class="equation">
+      <span class="equation-name">Angles d’Euler XYZ</span>
+      <span>$\vec\theta = (\theta_x,\theta_y,\theta_z)$</span>
+      <small id="live-theta">θ = (0°, 0°, 0°)</small>
+    </div>
+    <div class="equation">
+      <span class="equation-name">Vitesse angulaire</span>
+      <span>$\vec\omega = \dot{\vec\theta}$ (approximation XYZ)</span>
+      <small id="live-omega">ω = (0.00, 0.00, 0.00) rad/s</small>
+    </div>
+    <div class="equation">
+      <span class="equation-name">Accélération angulaire</span>
+      <span>$\vec\alpha = \mathbf I^{-1}\vec\tau$ (axes principaux)</span>
+      <small id="live-alpha">α = (0.00, 0.00, 0.00) rad/s²</small>
+    </div>
+    <div class="equation">
+      <span class="equation-name">Moment cinétique</span>
+      <span>$\vec L = \mathbf I\,\vec\omega$</span>
+      <small id="live-momentum">L = (0.00, 0.00, 0.00) kg·m²/s</small>
+    </div>
+    <div id="hyper-readouts" class="hyper-readouts" hidden>
+      <div class="equation">
+        <span class="equation-name">Origine fixe en 4D</span>
+        <span>$\vec r_4 = (0,0,0,0)$</span>
+        <small id="live-r4">r₄ = (0.00, 0.00, 0.00, 0.00) m</small>
+      </div>
+      <div class="equation">
+        <span class="equation-name">Rotations hyperspatiales</span>
+        <span>$(\theta_{xw},\theta_{yw},\theta_{zw})$</span>
+        <small id="live-hyper-theta">θ₄ = (0°, 0°, 0°)</small>
+      </div>
+    </div>
+    <div class="mass-control">
+      <label for="mass">Masse <b><span id="mass-value">2.0</span> kg</b></label>
+      <input id="mass" type="range" min="0.5" max="10" step="0.5" value="2">
+    </div>
+    <div class="legend">
+      <span><i class="dot velocity-dot"></i> Vitesse angulaire ω</span>
+      <span><i class="dot acceleration-dot"></i> Couple τ</span>
+      <span><i class="dot momentum-dot"></i> Moment cinétique L</span>
+    </div>
+  </aside>
+
+  <aside id="tools-panel" class="tools-panel" aria-label="Forme, projection et outils visuels" aria-hidden="true" inert>
+    <div class="eyebrow">GÉOMÉTRIE & AFFICHAGE</div>
+    <label class="control-label" for="shape-select">Solide étudié</label>
+    <select id="shape-select" class="control-select">
+      <optgroup label="Polyèdres et surfaces 3D">
+        <option value="cube">Cube · hexaèdre régulier</option>
+        <option value="tetrahedron">Tétraèdre · 4 faces</option>
+        <option value="octahedron">Octaèdre · 8 faces</option>
+        <option value="dodecahedron">Dodécaèdre · 12 faces</option>
+        <option value="icosahedron">Icosaèdre · 20 faces</option>
+        <option value="torus">Tore · genre 1</option>
+      </optgroup>
+      <optgroup label="Polytopes 4D">
+        <option value="tesseract">Tesseract · hypercube</option>
+        <option value="pentachoron">Pentachore · 5-cell</option>
+        <option value="hexadecachoron">Hexadécachore · 16-cell</option>
+      </optgroup>
+    </select>
+    <div class="projection-controls" id="projection-controls" hidden>
+      <label class="control-label" for="projection-select">Projection 4D → 3D</label>
+      <select id="projection-select" class="control-select">
+        <option value="stereographic">Stéréographique S³</option>
+        <option value="perspective">Perspective centrale en W</option>
+        <option value="orthographic">Orthographique</option>
+      </select>
+      <small class="technical-note">Stéréographique : $\hat x/(1-\hat w)$ sur la sphère unité. Perspective : $s=1/(d-w)$, $d=4$. Orthographique : $s=1$. L’origine 4D reste fixe, $w=0$.</small>
+      <div class="plane-rotations">
+        <span class="control-label">Angles des plans de rotation</span>
+        <label class="range-label" for="angle-xy">XY <b><span id="angle-value-xy">0°</span></b></label>
+        <input id="angle-xy" data-plane="xy" type="range" min="-180" max="180" step="1" value="0">
+        <label class="range-label" for="angle-xz">XZ <b><span id="angle-value-xz">0°</span></b></label>
+        <input id="angle-xz" data-plane="xz" type="range" min="-180" max="180" step="1" value="0">
+        <label class="range-label" for="angle-yz">YZ <b><span id="angle-value-yz">0°</span></b></label>
+        <input id="angle-yz" data-plane="yz" type="range" min="-180" max="180" step="1" value="0">
+        <label class="range-label" for="angle-xw">XW <b><span id="angle-value-xw">0°</span></b></label>
+        <input id="angle-xw" data-plane="xw" type="range" min="-180" max="180" step="1" value="0">
+        <label class="range-label" for="angle-yw">YW <b><span id="angle-value-yw">0°</span></b></label>
+        <input id="angle-yw" data-plane="yw" type="range" min="-180" max="180" step="1" value="0">
+        <label class="range-label" for="angle-zw">ZW <b><span id="angle-value-zw">0°</span></b></label>
+        <input id="angle-zw" data-plane="zw" type="range" min="-180" max="180" step="1" value="0">
+      </div>
+    </div>
+    <div class="rotation-entry">
+      <span class="control-label">Orientation absolue · Euler XYZ</span>
+      <div class="angle-entry-grid">
+        <label for="angle-input-x">θ<sub>x</sub> °<input id="angle-input-x" type="number" min="-3600" max="3600" step="1" value="0"></label>
+        <label for="angle-input-y">θ<sub>y</sub> °<input id="angle-input-y" type="number" min="-3600" max="3600" step="1" value="0"></label>
+        <label for="angle-input-z">θ<sub>z</sub> °<input id="angle-input-z" type="number" min="-3600" max="3600" step="1" value="0"></label>
+      </div>
+      <small id="orientation-error" class="input-error" role="alert"></small>
+      <button id="apply-orientation" class="camera-button">Appliquer les angles</button>
+      <button id="reset-orientation" class="camera-button secondary-action">Réinitialiser l’orientation</button>
+    </div>
+    <label class="check-row"><input id="axes-toggle" type="checkbox" checked> Axes locaux X / Y / Z</label>
+    <label class="check-row"><input id="vectors-toggle" type="checkbox" checked> Vecteurs ω, τ et L</label>
+    <button id="camera-toggle" class="camera-button" aria-pressed="true">⌖ Caméra suiveuse</button>
+    <p class="camera-help">Déverrouille la caméra pour tourner autour du cube avec la souris.</p>
+  </aside>
+
+  <aside id="tutorial-panel" class="tutorial-panel" aria-label="Simulations pédagogiques" aria-hidden="true" inert>
+    <header class="tutorial-header">
+      <div>
+        <div class="eyebrow">MÉDIATHÈQUE INTERACTIVE</div>
+        <h2>Simulations & explications</h2>
+      </div>
+      <button id="close-tutorial" class="close-button" aria-label="Fermer les simulations">×</button>
+    </header>
+    <p class="tutorial-note">Démonstrations animées pour chaque solide. Elles illustrent la translation et la rotation sans déplacer l’objet principal, qui reste fixe en O.</p>
+    <div class="tutorial-layout">
+      <section class="demo-column" aria-label="Lecteur de simulation">
+    <div class="tutorial-selectors">
+      <label for="demo-shape">Solide
+        <select id="demo-shape" class="control-select">
+          <optgroup label="Solides 3D">
+            <option value="cube">Cube</option>
+            <option value="tetrahedron">Tétraèdre</option>
+            <option value="octahedron">Octaèdre</option>
+            <option value="dodecahedron">Dodécaèdre</option>
+            <option value="icosahedron">Icosaèdre</option>
+            <option value="torus">Tore</option>
+          </optgroup>
+          <optgroup label="Polytopes 4D">
+            <option value="tesseract">Tesseract</option>
+            <option value="pentachoron">Pentachore (5-cell)</option>
+            <option value="hexadecachoron">Hexadécachore (16-cell)</option>
+          </optgroup>
+        </select>
+      </label>
+      <label for="demo-topic">Notion
+        <select id="demo-topic" class="control-select">
+          <option value="translation">Translation</option>
+          <option value="rotation">Rotation 3D</option>
+          <option value="hyperspace">Rotation hyperspatiale 4D</option>
+        </select>
+      </label>
+    </div>
+    <div class="demo-stage">
+      <div id="tutorial-viewport" aria-label="Simulation animée du solide"></div>
+      <span class="demo-badge">SIMULATION EN TEMPS RÉEL</span>
+      <span id="demo-overlay" class="demo-overlay">Centre O fixe</span>
+    </div>
+    <div class="demo-playback">
+      <div class="demo-actions">
+        <button id="demo-previous" class="demo-nav" title="Leçon précédente">‹</button>
+        <button id="demo-play" class="demo-play-button">▶ Lire</button>
+        <button id="demo-restart" class="demo-nav" title="Recommencer la démonstration">↺</button>
+        <button id="demo-next" class="demo-nav" title="Leçon suivante">›</button>
+        <span id="demo-count" class="demo-count">1 / 21</span>
+      </div>
+      <input id="demo-progress" type="range" min="0" max="1000" value="0" aria-label="Progression de la simulation">
+      <div class="demo-chapter-nav" id="demo-chapter-nav" aria-label="Chapitres de la leçon"></div>
+    </div>
+    <article class="demo-explanation">
+      <div class="eyebrow" id="demo-topic-label">CINÉMATIQUE</div>
+      <h3 id="demo-title">Translation pure</h3>
+      <p id="demo-description"></p>
+      <div class="demo-equation" id="demo-equation"></div>
+    </article>
+    <p class="demo-footnote">La fenêtre de démonstration est indépendante : elle n’altère ni la position fixe de l’objet principal, ni ses angles enregistrés.</p>
+      </section>
+      <aside class="associated-course" aria-label="Cours associé à la simulation">
+        <div>
+          <div class="eyebrow">COURS ASSOCIÉ</div>
+          <h3 id="demo-course-title">Analyse · Mécanique · Algèbre</h3>
+          <p id="demo-course-shape" class="demo-course-shape"></p>
+        </div>
+        <article class="demo-course-card">
+          <div class="eyebrow">ANALYSE</div>
+          <h4 id="demo-analysis-title"></h4>
+          <p id="demo-analysis-body"></p>
+          <div id="demo-analysis-equation" class="demo-equation"></div>
+        </article>
+        <article class="demo-course-card">
+          <div class="eyebrow">MÉCANIQUE</div>
+          <h4 id="demo-mechanics-title"></h4>
+          <p id="demo-mechanics-body"></p>
+          <div id="demo-mechanics-equation" class="demo-equation"></div>
+        </article>
+        <article class="demo-course-card">
+          <div class="eyebrow">ALGÈBRE LINÉAIRE</div>
+          <h4 id="demo-algebra-title"></h4>
+          <p id="demo-algebra-body"></p>
+          <div id="demo-algebra-equation" class="demo-equation"></div>
+        </article>
+        <button id="demo-to-course" class="course-screen-button">Ouvrir le cours complet →</button>
+      </aside>
+    </div>
+  </aside>
+
+  <div class="scene-hint"><span class="hint-dot"></span> CENTRE FIXE EN O · SOL HERBEUX · GRILLE 1 M</div>
+
+  <nav id="toolbar" class="toolbar" aria-label="Commandes de la simulation">
+    <div class="toolbar-heading">
+      <div><span class="eyebrow">ROTATION DU SOLIDE · CENTRE FIXE</span><strong>Couples et orientation</strong></div>
+      <div class="toolbar-heading-actions">
+        <span class="toolbar-tip">AZERTY · Maintiens une touche ou clique</span>
+        <button id="toggle-actions" class="panel-launcher" aria-expanded="false">Afficher les commandes</button>
+      </div>
+    </div>
+    <div class="tool-groups">
+      <div class="tool-group">
+        <span class="group-title">COUPLES · rotation</span>
+        <div class="tool-buttons">
+          <button data-torque="x" title="Tourner autour de X">↻<sub>X</sub> <span>Axe X</span></button>
+          <button data-torque="y" title="Tourner autour de Y">↻<sub>Y</sub> <span>Axe Y</span></button>
+          <button data-torque="z" title="Tourner autour de Z">↻<sub>Z</sub> <span>Axe Z</span></button>
+        </div>
+      </div>
+      <div class="tool-group utility-group">
+        <span class="group-title">SIMULATION</span>
+        <div class="tool-buttons">
+          <button id="brake" class="brake-action" title="Freiner (Espace)">Ⅱ <span>Freiner</span></button>
+          <button id="reset" class="reset-action" title="Réinitialiser l’orientation">↺ <span>Réinitialiser</span></button>
+        </div>
+      </div>
+    </div>
+    <p class="key-guide"><b>↑ / ↓</b> rotation X &nbsp;·&nbsp; <b>← / →, A / W</b> rotation Y &nbsp;·&nbsp; <b>Z / S</b> rotation X &nbsp;·&nbsp; <b>Q / D</b> rotation Z &nbsp;·&nbsp; <b>Espace</b> frein angulaire</p>
+  </nav>
+
+  <section id="learning-hub" class="modal hub-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="hub-title">
+    <div class="hub-card">
+      <header class="course-header">
+        <div><div class="eyebrow">GEOSIM · PARCOURS D’APPRENTISSAGE</div><h2 id="hub-title">De l’observation à la théorie</h2></div>
+        <button id="close-learning-hub" class="close-button" aria-label="Fermer le parcours">×</button>
+      </header>
+      <p class="hub-intro">Un espace de liaison entre les simulations et le cours complet. Choisissez un solide, observez son mouvement, puis reliez ce que vous voyez aux équations et aux matrices.</p>
+      <div class="hub-path">
+        <article class="hub-step">
+          <span class="hub-step-number">01</span>
+          <div class="eyebrow">OBSERVER</div>
+          <h3>Simulations guidées</h3>
+          <p>Explorez translation, rotation 3D et rotations hyperspatiales 4D. Chaque démonstration est découpée en chapitres, avec formules et commandes de lecture.</p>
+          <button id="hub-open-demos" class="course-screen-button">Aller aux démos →</button>
+        </article>
+        <article class="hub-step hub-step-current">
+          <span class="hub-step-number">02</span>
+          <div class="eyebrow">COMPRENDRE</div>
+          <h3>Cours complet & matrices</h3>
+          <p>Étudiez la cinématique rigide, la dynamique rotationnelle, les tenseurs d’inertie, les transformations homogènes et les projections 4D. Les matrices correspondent à la forme sélectionnée.</p>
+          <button id="hub-open-course" class="course-screen-button">Ouvrir le cours →</button>
+        </article>
+        <article class="hub-step">
+          <span class="hub-step-number">03</span>
+          <div class="eyebrow">CONSOLIDER</div>
+          <h3>Prendre des notes</h3>
+          <p>Consignez vos observations et réponses aux exercices dans le panneau du cours. Les notes sont sauvegardées dans le navigateur et restent disponibles après fermeture de la page.</p>
+          <button id="hub-open-notes" class="course-screen-button">Cours & notes →</button>
+        </article>
+      </div>
+      <p class="hub-footer">Conseil : commencez par une démonstration, ouvrez le chapitre associé, puis comparez les propriétés d’inertie de plusieurs solides.</p>
+    </div>
+  </section>
+
+  <section id="course" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="course-title">
+    <div class="course-card">
+      <header class="course-header">
+        <div><div class="eyebrow">COURS COMPLET · MÉCANIQUE & GÉOMÉTRIE</div><h2 id="course-title">Analyse du solide</h2></div>
+        <div class="course-header-actions">
+          <button id="course-fullscreen" class="course-screen-button" aria-pressed="false">Plein écran</button>
+          <button id="close-course" class="close-button" aria-label="Fermer le cours">×</button>
+        </div>
+      </header>
+      <div class="course-workspace">
+        <div class="course-content" id="course-content">
+        <article id="chapter-geometry" class="course-section full-width">
+          <h3>1. Géométrie, topologie et propriétés d’inertie</h3>
+          <p id="geometry-description"></p>
+          <p>Un solide rigide est décrit par un ensemble de points dont les distances mutuelles ne varient pas. Les nombres de sommets, arêtes, faces et cellules décrivent sa structure combinatoire; ils sont distincts des mesures métriques comme l’aire, le volume ou le moment d’inertie.</p>
+          <div id="geometry-properties" class="properties-grid"></div>
+          <p>Le tenseur d’inertie relie la vitesse angulaire au moment cinétique. Dans les axes principaux, il est diagonal; hors de ces axes, les termes non diagonaux traduisent le couplage entre composantes.</p>
+        </article>
+        <article id="chapter-dynamics" class="course-section full-width">
+          <h3>3. Modèle dynamique & intégration numérique</h3>
+          <p><b>Centre fixe.</b> La position du centre de masse est contrainte à l’origine du repère : $\vec r_O(t)=\vec 0$. La simulation n’intègre ni vitesse ni accélération linéaires.</p>
+          <p><b>Dynamique de rotation.</b> Dans les axes principaux, $\vec L=\mathbf I\vec\omega$ et $\vec\tau=\dot{\vec L}$. Pour un axe principal découplé, $\alpha_i=\tau_i/I_i$.</p>
+          <p><b>Intégration.</b> Le couple appliqué accélère la vitesse angulaire; celle-ci met à jour l’orientation à chaque pas borné $\Delta t$. Un amortissement faible stabilise les rotations lancées par les touches et les boutons.</p>
+          <p><b>Orientation absolue.</b> Les champs d’angles appliquent directement $(\theta_x,\theta_y,\theta_z)$ en degrés selon la convention Euler XYZ et arrêtent la rotation instantanée avant de poser cette attitude.</p>
+          <p>Pour un solide général, l’équation dans les axes du corps est $\vec\tau=\mathbf I\dot{\vec\omega}+\vec\omega\times(\mathbf I\vec\omega)$. L’approximation par composantes utilisée ici néglige le terme gyroscopique et suppose des axes principaux découplés; elle est pédagogique, mais n’est pas le simulateur complet d’un corps asymétrique en rotation libre.</p>
+          <div class="course-callout"><b>Lecture des vecteurs :</b> $\vec\tau$ est l’action appliquée, $\vec\omega$ l’état cinématique et $\vec L=\mathbf I\vec\omega$ la quantité de mouvement angulaire. À couple identique, un moment d’inertie plus grand produit une accélération angulaire plus faible.</div>
+        </article>
+        <article id="chapter-rotation-matrices" class="course-section full-width">
+          <h3>4. Rotations 3D & transformation homogène</h3>
+          <p>Les matrices sont des rotations actives appliquées aux vecteurs colonnes. Par exemple, $R_x(\theta)=\begin{bmatrix}1&0&0\\0&\cos\theta&-\sin\theta\\0&\sin\theta&\cos\theta\end{bmatrix}$. Les matrices $R_y$ et $R_z$ utilisent la même convention de signe.</p>
+          <p>Les rotations ne commutent généralement pas : $R_yR_x\ne R_xR_y$. L’application utilise la convention Euler XYZ de Three.js; les matrices élémentaires ci-dessous sont accompagnées de la matrice homogène correspondant à l’orientation courante. Près d’une singularité Euler, une attitude peut avoir plusieurs triplets d’angles équivalents.</p>
+          <div class="matrix-grid">
+            <div><h4>Autour de X</h4><pre id="matrix-x"></pre></div>
+            <div><h4>Autour de Y</h4><pre id="matrix-y"></pre></div>
+            <div><h4>Autour de Z</h4><pre id="matrix-z"></pre></div>
+          </div>
+          <p>En coordonnées homogènes, rotation et translation sont réunies dans une matrice affine 4 × 4. Ici sa dernière colonne reste nulle, car le centre est contraint à l’origine.</p>
+          <pre id="matrix-world" class="world-matrix"></pre>
+        </article>
+        <article id="hyper-course-section" class="course-section full-width" hidden>
+          <h3>5. Géométrie 4D, rotations hyperspatiales et projections</h3>
+          <p>Un point 4D s’écrit $(x,y,z,w)$. Une rotation élémentaire agit dans un plan coordonné et laisse fixes les deux autres coordonnées. Les six plans sont XY, XZ, YZ, XW, YW et ZW; dans chacun, le bloc actif vaut $\begin{bmatrix}\cos\phi&-\sin\phi\\\sin\phi&\cos\phi\end{bmatrix}$.</p>
+          <div class="matrix-grid hyper-matrix-grid">
+            <div><h4>$R_{XY}$</h4><pre id="matrix-xy"></pre></div>
+            <div><h4>$R_{XZ}$</h4><pre id="matrix-xz"></pre></div>
+            <div><h4>$R_{YZ}$</h4><pre id="matrix-yz"></pre></div>
+            <div><h4>$R_{XW}$</h4><pre id="matrix-xw"></pre></div>
+            <div><h4>$R_{YW}$</h4><pre id="matrix-yw"></pre></div>
+            <div><h4>$R_{ZW}$</h4><pre id="matrix-zw"></pre></div>
+          </div>
+          <p><b>Orthographique :</b> $(x,y,z,w)\mapsto(x,y,z)$; les variations de W sont invisibles. <b>Perspective :</b> $(x,y,z,w)\mapsto(sx,sy,sz)$ avec $s=1/(d-w)$; les sommets proches du plan $w=d$ sont fortement agrandis. <b>Stéréographique :</b> après normalisation sur $S^3$, projection depuis un pôle vers un hyperplan 3D; elle préserve les angles, mais pas les longueurs.</p>
+          <p class="projection-explanation"><b>À distinguer :</b> une projection est une règle de visualisation, pas une rotation supplémentaire. Le curseur W décale les coordonnées avant projection; il ne représente ni une hauteur XYZ ni un degré de liberté mécanique observable directement. Près du pôle stéréographique ou lorsque $d-w$ tend vers zéro, l’échelle diverge; les limites numériques de l’application contiennent ces valeurs.</p>
+        </article>
+        <article id="chapter-kinematics" class="course-section full-width">
+          <h3>2. Cinématique d’un solide rigide</h3>
+          <p>La position d’un point matériel $P$ s’écrit $\vec r_P(t)=\vec r_O(t)+\mathbf R(t)\vec\rho_P$, où $\vec\rho_P$ est sa position dans le repère lié au solide. La matrice $\mathbf R$ conserve les longueurs et les angles.</p>
+          <p><b>Translation pure :</b> $\mathbf R(t)=\mathbf R_0$ et tous les points ont la même vitesse $\vec v_P=\vec v_O$. <b>Rotation pure autour de O :</b> $\vec r_O(t)=\vec 0$ et $\vec v_P=\vec\omega\times\vec r_P$. Les points sur l’axe instantané ont une vitesse nulle.</p>
+          <div class="course-callout"><b>À retenir.</b> La translation change $\vec r_O$ sans changer $\mathbf R$; la rotation change $\mathbf R$ en maintenant $\vec r_O$ fixe. Les translations sont démontrées uniquement dans la médiathèque afin que l’objet principal reste fixe.</div>
+        </article>
+        <article id="chapter-worked-example" class="course-section">
+          <h3>6. Exemple guidé : couple autour de Y</h3>
+          <ol>
+            <li>Sélectionnez une forme et relevez $I_{yy}$ dans ses propriétés.</li>
+            <li>Appliquez un couple autour de Y et observez le vecteur $\vec\tau$.</li>
+            <li>Comparez l’évolution de $\omega_y$, $\alpha_y$ et de l’angle $\theta_y$.</li>
+            <li>Recommencez avec une forme de moment d’inertie différent, à masse égale.</li>
+          </ol>
+          <p>Dans l’approximation mono-axe, $\alpha_y=\tau_y/I_{yy}$. Un moment d’inertie plus grand signifie une réponse angulaire plus faible pour un même couple.</p>
+        </article>
+        <article id="chapter-review" class="course-section">
+          <h3>7. Vérification des acquis</h3>
+          <ol>
+            <li>Quelle grandeur reste constante pendant une translation pure?</li>
+            <li>Pourquoi deux rotations successives autour d’axes différents dépendent-elles de leur ordre?</li>
+            <li>Quel est le rôle du tenseur d’inertie dans la dynamique rotationnelle?</li>
+            <li>Pourquoi une rotation XW modifie-t-elle l’apparence après projection perspective?</li>
+          </ol>
+          <p>Consignez vos réponses et les observations pour chaque forme dans vos notes de cours.</p>
+        </article>
+        </div>
+        <aside class="course-aside" aria-label="Navigation du cours et notes">
+          <button id="course-to-demos" class="course-screen-button">← Retour aux démos</button>
+          <section class="course-nav-section">
+            <div class="eyebrow">PARCOURS DU COURS</div>
+            <button class="course-nav-item" data-course-target="chapter-geometry">1 · Géométrie & inertie</button>
+            <button class="course-nav-item" data-course-target="chapter-kinematics">2 · Cinématique rigide</button>
+            <button class="course-nav-item" data-course-target="chapter-dynamics">3 · Dynamique</button>
+            <button class="course-nav-item" data-course-target="chapter-rotation-matrices">4 · Matrices 3D</button>
+            <button id="course-nav-4d" class="course-nav-item" data-course-target="hyper-course-section" hidden>5 · Rotations 4D</button>
+            <button class="course-nav-item" data-course-target="chapter-worked-example">6 · Exemple guidé</button>
+            <button class="course-nav-item" data-course-target="chapter-review">7 · Révision</button>
+          </section>
+          <section class="course-notes">
+            <label for="course-notes-input">Mes notes</label>
+            <p>Notes enregistrées localement dans ce navigateur.</p>
+            <textarea id="course-notes-input" placeholder="Équations, questions, observations par solide…"></textarea>
+            <button id="save-course-notes" class="course-screen-button">Enregistrer les notes</button>
+            <small id="course-notes-status" role="status">Aucune note chargée.</small>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </section>
+</body>
+</html>
