@@ -12,6 +12,7 @@ camera.position.set(6, 5, 9);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.localClippingEnabled = true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.12;
@@ -24,6 +25,16 @@ orbit.minDistance = 4;
 orbit.maxDistance = 35;
 orbit.maxPolarAngle = Math.PI * 0.49;
 orbit.enabled = false;
+const sectionPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+let sectionCutEnabled = false;
+const sectionHelper = new THREE.PlaneHelper(sectionPlane, 5, 0xd56b4f);
+sectionHelper.visible = false;
+const sectionSurface = new THREE.Mesh(
+  new THREE.PlaneGeometry(5, 5),
+  new THREE.MeshBasicMaterial({ color: '#e78467', transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
+);
+sectionSurface.visible = false;
+scene.add(sectionHelper, sectionSurface);
 
 scene.add(new THREE.HemisphereLight(0xeaf9ff, 0x617b4e, 2.0));
 const sunlight = new THREE.DirectionalLight(0xfff4d8, 2.3);
@@ -59,6 +70,8 @@ const verticalGridZ = makeGrid(36, 36, '#d5e9df', 0.19);
 verticalGridZ.rotation.x = Math.PI / 2;
 verticalGridZ.position.set(0, 18, -18);
 scene.add(verticalGridZ);
+const worldAxes = new THREE.AxesHelper(3.2);
+scene.add(worldAxes);
 
 const clouds = new THREE.Group();
 scene.add(clouds);
@@ -148,6 +161,17 @@ let hyperEdges = [];
 let shapeInertiaPerMass = [[2 / 3, 0, 0], [0, 2 / 3, 0], [0, 0, 2 / 3]];
 let geometryMetrics = null;
 const hyperAngles = { xy: 0, xz: 0, yz: 0, xw: 0, yw: 0, zw: 0 };
+const hyperTranslation = [0, 0, 0, 0];
+const hyperMotionOffset = [0, 0, 0, 0];
+let hyperTranslationAnimating = false;
+let hyperRotationAnimating = false;
+let hyperMotionTime = 0;
+const learningResources = [
+  { title: 'Khan Academy · Géométrie', url: 'https://www.khanacademy.org/math/geometry', detail: 'Formes, mesures et géométrie dans l’espace.' },
+  { title: 'MIT OpenCourseWare · Algèbre linéaire', url: 'https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/', detail: 'Matrices, vecteurs et transformations.' },
+  { title: 'MIT OpenCourseWare · Mécanique classique', url: 'https://ocw.mit.edu/courses/8-01sc-classical-mechanics-fall-2016/', detail: 'Mouvement, rotations et moment d’inertie.' },
+  { title: '3Blue1Brown · Algèbre linéaire visuelle', url: 'https://www.3blue1brown.com/topics/linear-algebra', detail: 'Série vidéo gratuite sur les vecteurs et les transformations.' }
+];
 
 function createSurfaceGeometry(key) {
   const constructors = {
@@ -281,12 +305,59 @@ function formatNumber(value, digits = 4) {
 function matrixText(rows) {
   return rows.map((row) => `[ ${row.map((value) => formatNumber(value, 3).padStart(7)).join('  ')} ]`).join('\n');
 }
+function renderCourseResources(key) {
+  const definition = shapeCatalog[key];
+  $('course-resource-title').textContent = `Pour le ${definition.name}`;
+  const list = $('course-resource-list');
+  list.replaceChildren();
+  learningResources.forEach((resource) => {
+    const item = document.createElement('li');
+    const link = document.createElement('a');
+    const detail = document.createElement('small');
+    link.href = resource.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = resource.title;
+    detail.textContent = resource.detail;
+    item.append(link, detail);
+    list.appendChild(item);
+  });
+}
+function setSectionMaterials() {
+  shape.traverse((child) => {
+    if (child === axes || !child.material) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach((material) => {
+      material.clippingPlanes = sectionCutEnabled ? [sectionPlane] : [];
+      material.needsUpdate = true;
+    });
+  });
+}
+function updateSectionPlane() {
+  const axis = $('slice-axis-select').value;
+  const offset = Number($('slice-offset').value);
+  sectionPlane.normal.set(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
+  sectionPlane.constant = -offset;
+  sectionSurface.position.set(axis === 'x' ? offset : 0, axis === 'y' ? offset : 0, axis === 'z' ? offset : 0);
+  sectionSurface.rotation.set(axis === 'y' ? -Math.PI / 2 : 0, axis === 'x' ? Math.PI / 2 : 0, 0);
+  $('slice-offset-value').textContent = `${offset.toFixed(1)} m`;
+  sectionHelper.visible = sectionCutEnabled;
+  sectionSurface.visible = sectionCutEnabled;
+  sectionHelper.updateMatrixWorld(true);
+}
+function setSectionCutEnabled(enabled) {
+  sectionCutEnabled = enabled;
+  $('slice-toggle').checked = enabled;
+  setSectionMaterials();
+  updateSectionPlane();
+}
 function setShapeProperties(key, mass) {
   const definition = shapeCatalog[key];
   const properties = $('geometry-properties');
   properties.replaceChildren();
   $('course-title').textContent = `Analyse du ${definition.name}`;
   $('geometry-description').textContent = definition.description;
+  renderCourseResources(key);
 
   const addProperty = (label, value) => {
     const cell = document.createElement('div');
@@ -342,6 +413,7 @@ function setShape(key) {
   hyperPoints = null;
   activeShapeKey = key;
   const isFourDimensional = definition.dimension === 4;
+  if (!isFourDimensional) stopHyperMotion();
   surfaceLayer.visible = !isFourDimensional;
   hyperLayer.visible = isFourDimensional;
   $('projection-controls').hidden = !isFourDimensional;
@@ -355,7 +427,8 @@ function setShape(key) {
   } else {
     const geometry = createSurfaceGeometry(key);
     geometry.computeBoundingBox();
-    surfaceMesh = new THREE.Mesh(geometry, key === 'cube' ? faceMaterials : polyhedronMaterial);
+    const material = key === 'cube' ? faceMaterials.map((faceMaterial) => faceMaterial.clone()) : polyhedronMaterial.clone();
+    surfaceMesh = new THREE.Mesh(geometry, material);
     surfaceLayer.add(surfaceMesh);
     if (key !== 'torus') {
       surfaceEdges = new THREE.LineSegments(
@@ -369,6 +442,7 @@ function setShape(key) {
   }
   $('read-shape').textContent = `${definition.name} · ${definition.dimension}D`;
   setShapeProperties(key, Number($('mass').value));
+  setSectionMaterials();
   updateHyperGeometry();
 }
 
@@ -677,7 +751,7 @@ function renderDemo(dt) {
       coordinates[firstAxis] = Math.cos(angle) * a - Math.sin(angle) * b;
       coordinates[secondAxis] = Math.sin(angle) * a + Math.cos(angle) * b;
       const scale = 1 / Math.max(0.35, 4 - coordinates[3]);
-      return new THREE.Vector3(coordinates[0] * scale, coordinates[1] * scale, coordinates[2] * scale);
+      return new THREE.Vector3(coordinates[0] * scale * 3, coordinates[1] * scale * 3, coordinates[2] * scale * 3);
     });
     const linePosition = demoHyperGeometry.getAttribute('position');
     demoHyperEdges.forEach(([start, end], index) => {
@@ -726,6 +800,7 @@ let followCamera = true;
 let braking = false;
 let orientationEntryDirty = false;
 const cameraOffset = new THREE.Vector3(6, 4.5, 8);
+let cameraBeforeSection = null;
 
 function applyTorque(axis) {
   orientationEntryDirty = false;
@@ -743,6 +818,20 @@ function brake() {
 }
 function releaseBrake() {
   braking = false;
+}
+function syncHyperMotionControls() {
+  const translationButton = $('translation-animation-toggle');
+  translationButton.setAttribute('aria-pressed', String(hyperTranslationAnimating));
+  translationButton.textContent = hyperTranslationAnimating ? 'Ⅱ Arrêter le déplacement' : '▶ Animer le déplacement';
+  const rotationButton = $('rotation-animation-toggle');
+  rotationButton.setAttribute('aria-pressed', String(hyperRotationAnimating));
+  rotationButton.textContent = hyperRotationAnimating ? 'Ⅱ Arrêter la rotation' : '▶ Animer la rotation';
+}
+function stopHyperMotion() {
+  hyperTranslationAnimating = false;
+  hyperRotationAnimating = false;
+  hyperMotionOffset.fill(0);
+  syncHyperMotionControls();
 }
 $('brake').addEventListener('pointerdown', brake);
 window.addEventListener('pointerup', releaseBrake);
@@ -766,6 +855,14 @@ function resetSimulation() {
     $(`angle-${plane}`).value = '0';
     $(`angle-value-${plane}`).textContent = '0°';
   });
+  hyperTranslation.fill(0);
+  hyperMotionTime = 0;
+  stopHyperMotion();
+  ['x', 'y', 'z', 'w'].forEach((axis, index) => {
+    $(`translation-${axis}`).value = '0';
+    $(`translation-value-${axis}`).textContent = '0.0 m';
+    hyperMotionOffset[index] = 0;
+  });
   ['x', 'y', 'z'].forEach((axis) => { $(`angle-input-${axis}`).value = '0'; });
   updateHyperGeometry();
   braking = false;
@@ -773,6 +870,7 @@ function resetSimulation() {
 $('reset').addEventListener('click', resetSimulation);
 
 $('axes-toggle').addEventListener('change', (event) => { axes.visible = event.target.checked; });
+$('world-axes-toggle').addEventListener('change', (event) => { worldAxes.visible = event.target.checked; });
 $('vectors-toggle').addEventListener('change', (event) => {
   torqueArrow.visible = event.target.checked;
   omegaArrow.visible = event.target.checked;
@@ -786,11 +884,54 @@ $('projection-select').addEventListener('change', updateHyperGeometry);
 document.querySelectorAll('[data-plane]').forEach((input) => {
   input.addEventListener('input', () => {
     hyperAngles[input.dataset.plane] = THREE.MathUtils.degToRad(Number(input.value));
-    $(`angle-value-${input.dataset.plane}`).textContent = `${input.value}°`;
+    $(`angle-value-${input.dataset.plane}`).textContent = `${Number(input.value).toFixed(1)}°`;
     updateHyperGeometry();
     updateMatrices();
   });
 });
+document.querySelectorAll('[data-translation-axis]').forEach((input) => {
+  input.addEventListener('input', () => {
+    const axis = Number(input.dataset.translationAxis);
+    hyperTranslation[axis] = Number(input.value);
+    const axisName = ['x', 'y', 'z', 'w'][axis];
+    $(`translation-value-${axisName}`).textContent = `${Number(input.value).toFixed(1)} m`;
+    updateHyperGeometry();
+    updateReadouts();
+  });
+});
+$('translation-animation-toggle').addEventListener('click', () => {
+  if (!hyperTranslationAnimating && !hyperRotationAnimating) hyperMotionTime = 0;
+  hyperTranslationAnimating = !hyperTranslationAnimating;
+  syncHyperMotionControls();
+});
+$('rotation-animation-toggle').addEventListener('click', () => {
+  if (!hyperTranslationAnimating && !hyperRotationAnimating) hyperMotionTime = 0;
+  hyperRotationAnimating = !hyperRotationAnimating;
+  syncHyperMotionControls();
+});
+$('motion-speed').addEventListener('input', (event) => {
+  $('motion-speed-value').textContent = `${Number(event.target.value).toFixed(1)} °/s`;
+});
+$('slice-toggle').addEventListener('change', (event) => {
+  if (event.target.checked) {
+    cameraBeforeSection = { follow: followCamera, offset: cameraOffset.clone() };
+    followCamera = true;
+    orbit.enabled = false;
+    cameraOffset.set(8, 6, 11);
+    $('camera-toggle').setAttribute('aria-pressed', 'true');
+    $('camera-toggle').textContent = '⌖ Caméra suiveuse';
+  } else if (cameraBeforeSection) {
+    followCamera = cameraBeforeSection.follow;
+    orbit.enabled = !followCamera;
+    cameraOffset.copy(cameraBeforeSection.offset);
+    $('camera-toggle').setAttribute('aria-pressed', String(followCamera));
+    $('camera-toggle').textContent = followCamera ? '⌖ Caméra suiveuse' : '◎ Caméra libre';
+    cameraBeforeSection = null;
+  }
+  setSectionCutEnabled(event.target.checked);
+});
+$('slice-axis-select').addEventListener('change', updateSectionPlane);
+$('slice-offset').addEventListener('input', updateSectionPlane);
 $('mass').addEventListener('input', (event) => {
   const mass = Number(event.target.value);
   $('mass-value').textContent = mass.toFixed(1);
@@ -1063,6 +1204,9 @@ function projectedHyperPoint(vertex) {
   Object.entries(planeAxes).forEach(([plane, [first, second]]) => {
     rotateHyperPoint(coordinates, first, second, hyperAngles[plane]);
   });
+  coordinates.forEach((value, axis) => {
+    coordinates[axis] = value + hyperTranslation[axis] + hyperMotionOffset[axis];
+  });
   const projection = $('projection-select').value;
   const norm = Math.hypot(...coordinates);
   const scale = projection === 'orthographic'
@@ -1084,6 +1228,30 @@ function updateHyperGeometry() {
   const pointPositions = hyperPoints.geometry.getAttribute('position');
   projected.forEach((point, index) => pointPositions.setXYZ(index, point.x, point.y, point.z));
   pointPositions.needsUpdate = true;
+}
+function updateHyperMotion(dt) {
+  const isFourDimensional = shapeCatalog[activeShapeKey].dimension === 4;
+  hyperMotionOffset.fill(0);
+  if (!isFourDimensional || (!hyperTranslationAnimating && !hyperRotationAnimating)) {
+    updateHyperGeometry();
+    return;
+  }
+
+  const speed = THREE.MathUtils.degToRad(Number($('motion-speed').value));
+  hyperMotionTime += dt * speed;
+  if (hyperTranslationAnimating) {
+    const axis = Number($('translation-axis-select').value);
+    hyperMotionOffset[axis] = 1.25 * Math.sin(hyperMotionTime);
+  }
+  if (hyperRotationAnimating) {
+    const plane = $('rotation-plane-select').value;
+    const angle = hyperAngles[plane] + dt * speed;
+    hyperAngles[plane] = Math.atan2(Math.sin(angle), Math.cos(angle));
+    const degrees = THREE.MathUtils.radToDeg(hyperAngles[plane]);
+    $(`angle-${plane}`).value = degrees.toFixed(1);
+    $(`angle-value-${plane}`).textContent = `${degrees.toFixed(1)}°`;
+  }
+  updateHyperGeometry();
 }
 function hyperRotationMatrix(plane, angle) {
   const matrix = Array.from({ length: 4 }, (_, row) => Array.from({ length: 4 }, (_, column) => row === column ? 1 : 0));
@@ -1129,8 +1297,9 @@ function updateReadouts() {
   $('live-momentum').textContent = `L = ${textVector(angularMomentum)} kg·m²/s`;
   const degrees = (value) => `${THREE.MathUtils.radToDeg(value).toFixed(0)}°`;
   $('live-theta').textContent = `θ = (${degrees(rotation.x)}, ${degrees(rotation.y)}, ${degrees(rotation.z)})`;
-  $('live-r4').textContent = 'r₄ = (0.00, 0.00, 0.00, 0.00) m';
-  $('live-hyper-theta').textContent = `θ₄ = (${degrees(hyperAngles.xw)}, ${degrees(hyperAngles.yw)}, ${degrees(hyperAngles.zw)})`;
+  const translated = hyperTranslation.map((value, axis) => value + hyperMotionOffset[axis]);
+  $('live-r4').textContent = `r₄ = (${translated.map((value) => value.toFixed(2)).join(', ')}) m`;
+  $('live-hyper-theta').textContent = `θ₄ = XY ${degrees(hyperAngles.xy)} · XZ ${degrees(hyperAngles.xz)} · YZ ${degrees(hyperAngles.yz)} · XW ${degrees(hyperAngles.xw)} · YW ${degrees(hyperAngles.yw)} · ZW ${degrees(hyperAngles.zw)}`;
   ['x', 'y', 'z'].forEach((axis) => {
     const input = $(`angle-input-${axis}`);
     if (!orientationEntryDirty && document.activeElement !== input) input.value = THREE.MathUtils.radToDeg(rotation[axis]).toFixed(1);
@@ -1189,6 +1358,7 @@ function render() {
   requestAnimationFrame(render);
   const dt = Math.min(clock.getDelta(), 0.04);
   updateSimulation(dt);
+  updateHyperMotion(dt);
   shape.position.copy(position);
   shape.rotation.copy(rotation);
   if (followCamera) {

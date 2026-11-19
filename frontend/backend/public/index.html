@@ -45,7 +45,7 @@
   <aside id="lesson-panel" class="lesson-panel" aria-label="Grandeurs physiques en direct" aria-hidden="true" inert>
     <div class="eyebrow">CINÉMATIQUE DE ROTATION</div>
     <h1>Orientation du solide</h1>
-    <p class="intro">Le centre reste fixe en O. Seule l’attitude du solide évolue dans le référentiel monde.</p>
+    <p class="intro">Le repère monde XYZ reste fixe en O. Le solide tourne; les polytopes 4D peuvent aussi être décalés avant leur projection.</p>
     <div class="equation">
       <span class="equation-name">Repère spatial invariant</span>
       <span>$\vec r_O(t) = (0,0,0)$</span>
@@ -73,14 +73,14 @@
     </div>
     <div id="hyper-readouts" class="hyper-readouts" hidden>
       <div class="equation">
-        <span class="equation-name">Origine fixe en 4D</span>
-        <span>$\vec r_4 = (0,0,0,0)$</span>
+        <span class="equation-name">Translation 4D · repère monde fixe</span>
+        <span>$\vec r_4 = (x,y,z,w)$</span>
         <small id="live-r4">r₄ = (0.00, 0.00, 0.00, 0.00) m</small>
       </div>
       <div class="equation">
-        <span class="equation-name">Rotations hyperspatiales</span>
-        <span>$(\theta_{xw},\theta_{yw},\theta_{zw})$</span>
-        <small id="live-hyper-theta">θ₄ = (0°, 0°, 0°)</small>
+        <span class="equation-name">Rotations dans les six plans</span>
+        <span>$(\theta_{xy},\theta_{xz},\theta_{yz},\theta_{xw},\theta_{yw},\theta_{zw})$</span>
+        <small id="live-hyper-theta">θ₄ = XY 0° · XZ 0° · YZ 0° · XW 0° · YW 0° · ZW 0°</small>
       </div>
     </div>
     <div class="mass-control">
@@ -119,21 +119,51 @@
         <option value="perspective">Perspective centrale en W</option>
         <option value="orthographic">Orthographique</option>
       </select>
-      <small class="technical-note">Stéréographique : $\hat x/(1-\hat w)$ sur la sphère unité. Perspective : $s=1/(d-w)$, $d=4$. Orthographique : $s=1$. L’origine 4D reste fixe, $w=0$.</small>
+      <small class="technical-note">Le repère monde XYZ reste fixe. Le décalage 4D est appliqué avant la projection; en orthographique, W seul est invisible.</small>
       <div class="plane-rotations">
-        <span class="control-label">Angles des plans de rotation</span>
-        <label class="range-label" for="angle-xy">XY <b><span id="angle-value-xy">0°</span></b></label>
-        <input id="angle-xy" data-plane="xy" type="range" min="-180" max="180" step="1" value="0">
-        <label class="range-label" for="angle-xz">XZ <b><span id="angle-value-xz">0°</span></b></label>
-        <input id="angle-xz" data-plane="xz" type="range" min="-180" max="180" step="1" value="0">
-        <label class="range-label" for="angle-yz">YZ <b><span id="angle-value-yz">0°</span></b></label>
-        <input id="angle-yz" data-plane="yz" type="range" min="-180" max="180" step="1" value="0">
-        <label class="range-label" for="angle-xw">XW <b><span id="angle-value-xw">0°</span></b></label>
-        <input id="angle-xw" data-plane="xw" type="range" min="-180" max="180" step="1" value="0">
-        <label class="range-label" for="angle-yw">YW <b><span id="angle-value-yw">0°</span></b></label>
-        <input id="angle-yw" data-plane="yw" type="range" min="-180" max="180" step="1" value="0">
-        <label class="range-label" for="angle-zw">ZW <b><span id="angle-value-zw">0°</span></b></label>
-        <input id="angle-zw" data-plane="zw" type="range" min="-180" max="180" step="1" value="0">
+        <details class="control-disclosure" open>
+          <summary>Rotation par plan · 6 angles</summary>
+          <label class="range-label" for="angle-xy">XY <b><span id="angle-value-xy">0°</span></b></label>
+          <input id="angle-xy" data-plane="xy" type="range" min="-180" max="180" step="0.1" value="0">
+          <label class="range-label" for="angle-xz">XZ <b><span id="angle-value-xz">0°</span></b></label>
+          <input id="angle-xz" data-plane="xz" type="range" min="-180" max="180" step="0.1" value="0">
+          <label class="range-label" for="angle-yz">YZ <b><span id="angle-value-yz">0°</span></b></label>
+          <input id="angle-yz" data-plane="yz" type="range" min="-180" max="180" step="0.1" value="0">
+          <label class="range-label" for="angle-xw">XW <b><span id="angle-value-xw">0°</span></b></label>
+          <input id="angle-xw" data-plane="xw" type="range" min="-180" max="180" step="0.1" value="0">
+          <label class="range-label" for="angle-yw">YW <b><span id="angle-value-yw">0°</span></b></label>
+          <input id="angle-yw" data-plane="yw" type="range" min="-180" max="180" step="0.1" value="0">
+          <label class="range-label" for="angle-zw">ZW <b><span id="angle-value-zw">0°</span></b></label>
+          <input id="angle-zw" data-plane="zw" type="range" min="-180" max="180" step="0.1" value="0">
+        </details>
+        <details class="control-disclosure">
+          <summary>Déplacement · vecteur (x, y, z, w)</summary>
+          <small class="technical-note">Déplace les sommets par rapport au repère monde, sans déplacer les axes.</small>
+          <label class="range-label" for="translation-x">X <b><span id="translation-value-x">0.0 m</span></b></label>
+          <input id="translation-x" data-translation-axis="0" type="range" min="-2" max="2" step="0.1" value="0">
+          <label class="range-label" for="translation-y">Y <b><span id="translation-value-y">0.0 m</span></b></label>
+          <input id="translation-y" data-translation-axis="1" type="range" min="-2" max="2" step="0.1" value="0">
+          <label class="range-label" for="translation-z">Z <b><span id="translation-value-z">0.0 m</span></b></label>
+          <input id="translation-z" data-translation-axis="2" type="range" min="-2" max="2" step="0.1" value="0">
+          <label class="range-label" for="translation-w">W <b><span id="translation-value-w">0.0 m</span></b></label>
+          <input id="translation-w" data-translation-axis="3" type="range" min="-2" max="2" step="0.1" value="0">
+          <label class="control-label" for="translation-axis-select">Animer le long de</label>
+          <select id="translation-axis-select" class="control-select">
+            <option value="0">X</option><option value="1">Y</option><option value="2">Z</option><option value="3">W</option>
+          </select>
+          <button id="translation-animation-toggle" class="camera-button" aria-pressed="false">▶ Animer le déplacement</button>
+        </details>
+        <details class="control-disclosure">
+          <summary>Animation de rotation 4D</summary>
+          <label class="control-label" for="rotation-plane-select">Plan de rotation</label>
+          <select id="rotation-plane-select" class="control-select">
+            <option value="xy">XY</option><option value="xz">XZ</option><option value="yz">YZ</option>
+            <option value="xw">XW</option><option value="yw">YW</option><option value="zw">ZW</option>
+          </select>
+          <label class="range-label" for="motion-speed">Vitesse <b><span id="motion-speed-value">45 °/s</span></b></label>
+          <input id="motion-speed" type="range" min="10" max="120" step="5" value="45">
+          <button id="rotation-animation-toggle" class="camera-button" aria-pressed="false">▶ Animer la rotation</button>
+        </details>
       </div>
     </div>
     <div class="rotation-entry">
@@ -147,8 +177,25 @@
       <button id="apply-orientation" class="camera-button">Appliquer les angles</button>
       <button id="reset-orientation" class="camera-button secondary-action">Réinitialiser l’orientation</button>
     </div>
-    <label class="check-row"><input id="axes-toggle" type="checkbox" checked> Axes locaux X / Y / Z</label>
-    <label class="check-row"><input id="vectors-toggle" type="checkbox" checked> Vecteurs ω, τ et L</label>
+    <details class="control-disclosure" open>
+      <summary>Repères & vecteurs</summary>
+      <label class="check-row"><input id="world-axes-toggle" type="checkbox" checked> Repère monde XYZ · fixe</label>
+      <label class="check-row"><input id="axes-toggle" type="checkbox" checked> Axes locaux · solidaires</label>
+      <label class="check-row"><input id="vectors-toggle" type="checkbox" checked> Vecteurs ω, τ et L</label>
+    </details>
+    <details class="control-disclosure">
+      <summary>Coupe · vue d’ensemble automatique</summary>
+      <label class="check-row"><input id="slice-toggle" type="checkbox"> Activer la coupe</label>
+      <label class="control-label" for="slice-axis-select">Plan perpendiculaire à</label>
+      <select id="slice-axis-select" class="control-select">
+        <option value="x">Axe X · plan YZ</option>
+        <option value="y">Axe Y · plan XZ</option>
+        <option value="z">Axe Z · plan XY</option>
+      </select>
+      <label class="range-label" for="slice-offset">Position du plan <b><span id="slice-offset-value">0.0 m</span></b></label>
+      <input id="slice-offset" type="range" min="-2" max="2" step="0.05" value="0">
+      <small class="technical-note">La coupe masque un côté et affiche son plan. En 4D, elle s’applique à la projection 3D. Le repère XYZ reste fixe.</small>
+    </details>
     <button id="camera-toggle" class="camera-button" aria-pressed="true">⌖ Caméra suiveuse</button>
     <p class="camera-help">Déverrouille la caméra pour tourner autour du cube avec la souris.</p>
   </aside>
@@ -243,11 +290,11 @@
     </div>
   </aside>
 
-  <div class="scene-hint"><span class="hint-dot"></span> CENTRE FIXE EN O · SOL HERBEUX · GRILLE 1 M</div>
+  <div class="scene-hint"><span class="hint-dot"></span> REPÈRE XYZ FIXE · SOL HERBEUX · GRILLE 1 M</div>
 
   <nav id="toolbar" class="toolbar" aria-label="Commandes de la simulation">
     <div class="toolbar-heading">
-      <div><span class="eyebrow">ROTATION DU SOLIDE · CENTRE FIXE</span><strong>Couples et orientation</strong></div>
+      <div><span class="eyebrow">ROTATION DU SOLIDE · REPÈRE MONDE FIXE</span><strong>Couples et orientation</strong></div>
       <div class="toolbar-heading-actions">
         <span class="toolbar-tip">AZERTY · Maintiens une touche ou clique</span>
         <button id="toggle-actions" class="panel-launcher" aria-expanded="false">Afficher les commandes</button>
@@ -358,6 +405,7 @@
             <div><h4>$R_{ZW}$</h4><pre id="matrix-zw"></pre></div>
           </div>
           <p><b>Orthographique :</b> $(x,y,z,w)\mapsto(x,y,z)$; les variations de W sont invisibles. <b>Perspective :</b> $(x,y,z,w)\mapsto(sx,sy,sz)$ avec $s=1/(d-w)$; les sommets proches du plan $w=d$ sont fortement agrandis. <b>Stéréographique :</b> après normalisation sur $S^3$, projection depuis un pôle vers un hyperplan 3D; elle préserve les angles, mais pas les longueurs.</p>
+          <p>Les curseurs de translation ajoutent un décalage $(x,y,z,w)$ aux sommets avant projection; ils ne déplacent jamais le repère monde. Les animations de translation et de rotation peuvent être lancées séparément ou ensemble.</p>
           <p class="projection-explanation"><b>À distinguer :</b> une projection est une règle de visualisation, pas une rotation supplémentaire. Le curseur W décale les coordonnées avant projection; il ne représente ni une hauteur XYZ ni un degré de liberté mécanique observable directement. Près du pôle stéréographique ou lorsque $d-w$ tend vers zéro, l’échelle diverge; les limites numériques de l’application contiennent ces valeurs.</p>
         </article>
         <article id="chapter-kinematics" class="course-section full-width">
@@ -398,6 +446,11 @@
             <button id="course-nav-4d" class="course-nav-item" data-course-target="hyper-course-section" hidden>5 · Rotations 4D</button>
             <button class="course-nav-item" data-course-target="chapter-worked-example">6 · Exemple guidé</button>
             <button class="course-nav-item" data-course-target="chapter-review">7 · Révision</button>
+          </section>
+          <section class="course-resources" aria-label="Cours gratuits sur la forme sélectionnée">
+            <div class="eyebrow">COURS GRATUITS</div>
+            <h3 id="course-resource-title">Pour le Cube</h3>
+            <ul id="course-resource-list"></ul>
           </section>
           <section class="course-notes">
             <label for="course-notes-input">Mes notes</label>
